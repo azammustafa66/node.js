@@ -11,9 +11,6 @@ coverage
 # Ignore logs
 logs
 
-# Ignore any files or directories starting with a dot
-.*
-
 # Ignore any files with a .min.js extension
 *.min.js
 
