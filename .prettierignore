@@ -1,0 +1,49 @@
+# Ignore node_modules directory
+node_modules
+
+# Ignore build output directory
+build
+dist
+
+# Ignore coverage reports
+coverage
+
+# Ignore logs
+logs
+
+# Ignore any files or directories starting with a dot
+.*
+
+# Ignore any files with a .min.js extension
+*.min.js
+
+# Ignore any files with a .min.css extension
+*.min.css
+
+# Ignore any files with a .map extension
+*.map
+
+# Ignore any files with a .log extension
+*.log
+
+# Ignore any files with a .tsbuildinfo extension
+*.tsbuildinfo
+
+# Ignore env files
+*.env
+.env.*
+
+# Ignore any files with a .DS_Store extension
+.DS_Store
+
+# Ignore any files with a .vscode extension
+.vscode
+
+# Ignore any files with a .idea extension
+.idea
+
+# Ignore any files with a .git extension
+.git
+
+# Ignore any files with a .github extension
+.github
