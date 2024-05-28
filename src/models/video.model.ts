@@ -1,7 +1,7 @@
 import { Model, Schema, model } from 'mongoose'
 import mongooseAggregatePaginate from 'mongoose-aggregate-paginate-v2'
 
-import { IVideo } from '../types/models.interface'
+import { IVideo } from '../types/custom.types'
 
 const videoSchema = new Schema<IVideo>(
   {

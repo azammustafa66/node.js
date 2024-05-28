@@ -1,9 +1,9 @@
 import { Schema, model, Model } from 'mongoose'
-import jwt from 'jsonwebtoken'
+import * as jwt from 'jsonwebtoken'
 import * as bcrypt from 'bcrypt'
 import 'dotenv/config'
 
-import { IUser } from '../types/models.interface'
+import { IUser } from '../types/custom.types'
 
 const userSchema = new Schema<IUser>(
   {
@@ -70,7 +70,6 @@ userSchema.methods.generateAccessToken = function (this: IUser): string {
       _id: this._id,
       email: this.email,
       username: this.username,
-      fullName: this.fullName
     },
     process.env.ACCESS_TOKEN_SECRET!,
     { expiresIn: process.env.ACCESS_TOKEN_EXPIRES_IN }

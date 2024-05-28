@@ -1,13 +1,25 @@
 import { Request, Response } from 'express'
+import * as jwt from 'jsonwebtoken'
 import 'dotenv/config'
 
 import User from '../models/user.model'
-import { IUser } from '../types/models.interface'
+import {
+  CustomRequest,
+  IUser,
+  DecodedAccessToken,
+  DecodedRefreshToken
+} from '../types/custom.types'
 import ApiError from '../utils/APIError'
 import asyncHandler from '../utils/asyncHandler'
 import uploadToCloudinary from '../utils/cloudinary'
 import APIResponse from '../utils/APIResponse'
-import { httpOptions } from '../utils/constants'
+
+const isDesktop = (req: Request) =>
+  req.headers['user-agent']?.includes('PostmanRuntime') ||
+  req.headers['user-agent']?.includes('Windows') ||
+  req.headers['user-agent']?.includes('Macintosh') ||
+  req.headers['sec-ch-ua-platform'] === '"Windows"' ||
+  req.headers['sec-ch-ua-platform'] === '"macOS"'
 
 const generateTokens = async (user: IUser) => {
   try {
@@ -18,7 +30,7 @@ const generateTokens = async (user: IUser) => {
       throw new ApiError('Failed to generate tokens')
     }
 
-    await user.save({ validateBeforeSave: false })
+    await user.updateOne({ $set: { refreshToken }, validate: false })
     return { accessToken, refreshToken }
   } catch (error) {
     throw new ApiError('Failed to generate tokens')
@@ -78,14 +90,9 @@ export const registerUser = asyncHandler(async (req: Request, res: Response) => 
 })
 
 export const loginUser = asyncHandler(async (req: Request, res: Response) => {
-  // 1. Validate request body
-  // 2. Check if user exists
-  // 3. Compare password
-  // 4. Generate access and refresh tokens, then save refresh token to DB and to user's header
-
   const { email, username, password } = req.body
 
-  if (!email || !username) {
+  if (!(email || username)) {
     return res.status(400).json(new ApiError('Email or username is required'))
   }
 
@@ -111,25 +118,89 @@ export const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   const loggedInUser = await User.findById(user._id).select('-password -refreshToken')
 
-  return res
-    .status(200)
-    .header('Content-Security-Policy', "default-src 'self'")
-    .header('X-Frame-Options', 'DENY')
-    .header('X-XSS-Protection', '1; mode=block')
-    .json(
-      new APIResponse(
-        200,
-        { user: loggedInUser, accessToken, refreshToken },
-        'User logged in successfully'
+  return isDesktop(req)
+    ? res
+        .status(200)
+        .cookie('refreshToken', refreshToken, {
+          sameSite: 'none',
+          secure: process.env.NODE_ENV === 'production'
+        })
+        .cookie('accessToken', accessToken, {
+          sameSite: 'none',
+          secure: process.env.NODE_ENV === 'production'
+        })
+        .json(new APIResponse(200, loggedInUser, 'User logged in successfully'))
+    : res.status(200).json(
+        new APIResponse(
+          200,
+          {
+            loggedInUser,
+            accessToken,
+            refreshToken
+          },
+          'User logged in successfully'
+        )
       )
-    )
 })
 
-export const logOutUser = asyncHandler(async (req: Request, res: Response) => {
-  // 1. Clear user's cookie
-  // 2. Remove refresh token from DB
-  // 3. Send response
-  // 4. Redirect to login page
+export const logOutUser = asyncHandler(async (req: CustomRequest, res: Response) => {
+  try {
+    if (isDesktop(req)) {
+      res.clearCookie('refreshToken', {
+        sameSite: 'none',
+        secure: process.env.NODE_ENV === 'production'
+      })
+      res.clearCookie('accessToken', {
+        sameSite: 'none',
+        secure: process.env.NODE_ENV === 'production'
+      })
+    } else {
+      // Remove refresh token from the database and the client will remove the access token from local/session storage
+      const { _id } = req.user as DecodedAccessToken
+      await User.findByIdAndUpdate(_id, { $set: { refreshToken: '' } })
+    }
+    res.json(new APIResponse(200, null, 'User logged out successfully')) // Consistent response format
+  } catch (error: any) {
+    res.status(500).json(new ApiError(error.message || 'Failed to log out user'))
+  }
+})
 
-  const user = req
+export const refreshAccessToken = asyncHandler(async (req: Request, res: Response) => {
+  const incomingRefreshToken: string | undefined =
+    req.cookies?.refreshToken || req.headers.authorization?.split(' ')[1]
+
+  if (!incomingRefreshToken) {
+    return res.status(401).json(new ApiError('Unauthorized'))
+  }
+
+  try {
+    const decoded = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET!
+    ) as DecodedRefreshToken
+
+    const user = await User.findOne({ refreshToken: decoded?._id })
+
+    if (!user) {
+      return res.status(401).json(new ApiError('Unauthorized'))
+    }
+
+    if (user.refreshToken !== incomingRefreshToken) {
+      return res.status(401).json(new ApiError('Unauthorized'))
+    }
+
+    const { accessToken, refreshToken: newRefreshToken } = await generateTokens(user)
+
+    return isDesktop(req)
+      ? res.status(200).cookie('accessToken', accessToken).cookie('refreshToken', newRefreshToken)
+      : res.json(
+          new APIResponse(
+            200,
+            { accessToken, refreshToken: newRefreshToken },
+            'Token refreshed successfully'
+          )
+        )
+  } catch (error: any) {
+    return res.status(401).json(new ApiError('Unauthorized', error))
+  }
 })

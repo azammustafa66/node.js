@@ -1,7 +1,7 @@
 class ApiError extends Error {
   data: any
   success: boolean
-  errors: any[]
+  errors: any
 
   constructor(message = 'Something went wrong', errors = [], stack = '') {
     super(message)

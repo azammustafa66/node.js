@@ -1,7 +1,13 @@
 import { Router } from 'express'
 
-import { registerUser, loginUser } from '../controllers/user.controller'
+import {
+  registerUser,
+  loginUser,
+  logOutUser,
+  refreshAccessToken
+} from '../controllers/user.controller'
 import upload from '../middlewares/multer.middleware'
+import verifyToken from '../middlewares/auth.middleware'
 
 const router = Router()
 
@@ -12,6 +18,9 @@ router.route('/register').post(
   ]),
   registerUser
 )
-router.route('/login').get(loginUser)
+router.route('/login').post(loginUser)
+// secured routes
+router.route('/logout').post(verifyToken, logOutUser)
+router.route('/refresh-token').post(refreshAccessToken)
 
 export default router
