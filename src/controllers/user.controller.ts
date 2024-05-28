@@ -13,6 +13,7 @@ import ApiError from '../utils/APIError'
 import asyncHandler from '../utils/asyncHandler'
 import uploadToCloudinary from '../utils/cloudinary'
 import APIResponse from '../utils/APIResponse'
+import { ObjectId } from 'mongoose'
 
 const isDesktop = (req: Request) =>
   req.headers['user-agent']?.includes('PostmanRuntime') ||
@@ -203,4 +204,109 @@ export const refreshAccessToken = asyncHandler(async (req: Request, res: Respons
   } catch (error: any) {
     return res.status(401).json(new ApiError('Unauthorized', error))
   }
+})
+
+export const updatePassword = asyncHandler(async (req: CustomRequest, res: Response) => {
+  const { currentPassword, newPassword, confPassword } = req.body
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json(new ApiError('Current and new passwords are required'))
+  }
+
+  if (newPassword !== confPassword) {
+    return res.status(400).json(new ApiError('Passwords do not match'))
+  }
+
+  const { _id } = req.user as DecodedAccessToken
+
+  const user = await User.findById(_id)
+
+  if (!user) {
+    return res.status(404).json(new ApiError('User not found'))
+  }
+
+  const isPasswordMatch = await user.comparePassword(currentPassword)
+
+  if (!isPasswordMatch) {
+    return res.status(401).json(new ApiError('Invalid current password'))
+  }
+
+  user.password = newPassword
+  await user.save({ validateBeforeSave: false })
+
+  return res.json(new APIResponse(200, {}, 'Password updated successfully'))
+})
+
+export const getCurrentUser = asyncHandler(async (req: CustomRequest, res: Response) => {
+  return res.status(200).json(new APIResponse(200, req.user, 'User found successfully'))
+})
+
+export const updateAccountDetails = asyncHandler(async (req: CustomRequest, res: Response) => {
+  const { username, fullName, email } = req.body
+
+  if ([username, fullName, email].some((field) => field?.trim() === '')) {
+    return res.status(400).json(new ApiError('All fields are required'))
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    { $set: { username, fullName, email } },
+    { new: true }
+  ).select('-password')
+
+  return res.status(201).json(new APIResponse(200, user, 'User updated successfully'))
+})
+
+export const updateAvatar = asyncHandler(async (req: CustomRequest, res: Response) => {
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] }
+  const avatarLocalPath = files.avatar[0]?.path
+
+  if (!avatarLocalPath) {
+    return res.status(400).json(new ApiError('Avatar file is required'))
+  }
+
+  const avatar = await uploadToCloudinary(avatarLocalPath)
+
+  if (!avatar) {
+    return res.status(500).json(new ApiError('Failed to upload avatar'))
+  }
+
+  if (!avatar.secure_url) {
+    return res.status(500).json(new ApiError('Failed to upload avatar'))
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    { $set: { avatar: avatar.secure_url } },
+    { new: true }
+  ).select('-password')
+
+  return res.status(201).json(new APIResponse(200, user, 'Avatar updated successfully'))
+})
+
+export const updateCoverImage = asyncHandler(async (req: CustomRequest, res: Response) => {
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] }
+  const coverImageLocalPath = files.coverImage[0]?.path
+
+  if (!coverImageLocalPath) {
+    return res.status(400).json(new ApiError('Cover image file is required'))
+  }
+
+  const coverImage = await uploadToCloudinary(coverImageLocalPath)
+
+  if (!coverImage) {
+    return res.status(500).json(new ApiError('Failed to upload cover image'))
+  }
+
+  if (!coverImage.secure_url) {
+    return res.status(500).json(new ApiError('Failed to upload cover image'))
+  }
+
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    { $set: { coverImage: coverImage.secure_url } },
+    { new: true }
+  ).select('-password')
+
+  return res.status(201).json(new APIResponse(200, user, 'Cover image updated successfully'))
 })

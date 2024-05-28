@@ -3,8 +3,6 @@ import cors from 'cors'
 import cookieParser from 'cookie-parser'
 import 'dotenv/config'
 
-import verifyToken from './middlewares/auth.middleware'
-
 const app = express()
 
 app.use(cors({ origin: process.env.CORS_ORIGIN, credentials: true }))

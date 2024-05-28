@@ -1,4 +1,4 @@
-import { Request } from 'express'
+import e, { Request } from 'express'
 import { Document, Types } from 'mongoose'
 import { JwtPayload } from 'jsonwebtoken'
 
@@ -37,9 +37,24 @@ export type DecodedAccessToken = JwtPayload & {
 }
 
 export interface CustomRequest extends Request {
-  user?: DecodedAccessToken
+  user?: {
+    _id: Types.ObjectId
+    email: string
+    username: string
+    fullName: string
+    avatar: string
+    coverImage?: string
+    watchHistory: Types.ObjectId[]
+  }
 }
 
 export type DecodedRefreshToken = JwtPayload & {
   _id: Types.ObjectId
+}
+
+export interface ISubscription extends Document {
+  subscriber: Types.ObjectId
+  subscribedTo: Types.ObjectId
+  createdAt: Date
+  updatedAt: Date
 }

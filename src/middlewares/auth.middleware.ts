@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 
-import { DecodedAccessToken, CustomRequest } from '../types/custom.types'
+import { DecodedAccessToken, CustomRequest, IUser } from '../types/custom.types'
 import User from '../models/user.model'
 import asyncHandler from '../utils/asyncHandler'
 import ApiError from '../utils/APIError'
@@ -23,7 +23,7 @@ const verifyToken = asyncHandler(async (req: CustomRequest, res: Response, next:
       return res.status(401).json(new ApiError('Unauthorized'))
     }
 
-    req.user = decoded
+    req.user = user
     next()
   } catch (error: any) {
     return res.status(401).json(new ApiError(error.message || 'Unauthorized'))
