@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import * as jwt from 'jsonwebtoken'
+import { Types } from 'mongoose'
 import 'dotenv/config'
 
 import User from '../models/user.model'
@@ -13,7 +14,6 @@ import ApiError from '../utils/APIError'
 import asyncHandler from '../utils/asyncHandler'
 import uploadToCloudinary from '../utils/cloudinary'
 import APIResponse from '../utils/APIResponse'
-import { ObjectId } from 'mongoose'
 
 const isDesktop = (req: Request) =>
   req.headers['user-agent']?.includes('PostmanRuntime') ||
@@ -149,11 +149,13 @@ export const logOutUser = asyncHandler(async (req: CustomRequest, res: Response)
     if (isDesktop(req)) {
       res.clearCookie('refreshToken', {
         sameSite: 'none',
-        secure: process.env.NODE_ENV === 'production'
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true
       })
       res.clearCookie('accessToken', {
         sameSite: 'none',
-        secure: process.env.NODE_ENV === 'production'
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true
       })
     } else {
       // Remove refresh token from the database and the client will remove the access token from local/session storage
@@ -310,3 +312,106 @@ export const updateCoverImage = asyncHandler(async (req: CustomRequest, res: Res
 
   return res.status(201).json(new APIResponse(200, user, 'Cover image updated successfully'))
 })
+
+export const getUserChannelProfile = asyncHandler(async (req: CustomRequest, res: Response) => {
+  const username = req.params?.username
+
+  if (!username?.trim()) {
+    return res.status(400).json(new ApiError('Username is required'))
+  }
+
+  const channel = await User.aggregate([
+    {
+      $match: { username }
+    },
+    {
+      $lookup: {
+        from: 'subscriptions',
+        localField: '_id',
+        foreignField: 'subscribedTo',
+        as: 'subscribers'
+      }
+    },
+    {
+      $lookup: {
+        from: 'subscriptions',
+        localField: '_id',
+        foreignField: 'subscriber',
+        as: 'subscribedTo'
+      }
+    },
+    {
+      $addFields: {
+        subscriberCount: { $size: '$subscribers' },
+        subscribedToCount: { $size: '$subscribedTo' },
+        isSubscribed: {
+          $in: [req.user?._id, '$subscribers.subscriber']
+        }
+      }
+    },
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscriberCount: 1,
+        subscribedToCount: 1,
+        isSubscribed: 1
+      }
+    }
+  ])
+
+  if (!channel) {
+    return res.status(404).json(new ApiError('Channel does not exist'))
+  }
+
+  return res.status(200).json(new APIResponse(200, channel[0], 'Channel found successfully'))
+})
+
+export const getUserHistory = asyncHandler(async (req: CustomRequest, res: Response) => {
+  const history = await User.aggregate([
+    {
+      $match: {
+        _id: new Types.ObjectId(req.params?.username)
+      }
+    },
+    {
+      $lookup: {
+        from: 'videos',
+        localField: 'watchHistory',
+        foreignField: '_id',
+        as: 'watchHistory',
+        pipeline: [
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'owner',
+              foreignField: '_id',
+              as: 'owner',
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      $addFields: {
+        owner: { $first: '$owner' }
+      }
+    }
+  ])
+
+  return res
+    .status(200)
+    .json(new APIResponse(200, history[0].watchHistory, 'User history fetched successfully'))
+})
+
