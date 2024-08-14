@@ -23,6 +23,7 @@ const verifyToken = asyncHandler(async (req: CustomRequest, res: Response, next:
     }
 
     req.user = user
+
     next()
   } catch (error: any) {
     return res.status(401).json(new ApiError(error.message || 'Unauthorized'))

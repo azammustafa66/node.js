@@ -3,7 +3,7 @@ import { Document, Types } from 'mongoose'
 import { JwtPayload } from 'jsonwebtoken'
 
 export interface IUser extends Document {
-  _id?: Types.ObjectId
+  _id: Types.ObjectId
   username: string
   email: string
   fullName: string
@@ -18,7 +18,6 @@ export interface IUser extends Document {
 }
 
 export interface IVideo extends Document {
-  _id?: Types.ObjectId
   videoFile: string
   thumbnail: string
   title: string
@@ -49,12 +48,42 @@ export interface CustomRequest extends Request {
 }
 
 export type DecodedRefreshToken = JwtPayload & {
-  _id: Types.ObjectId
+  _id: string
 }
 
 export interface ISubscription extends Document {
+  _id: string
   subscriber: Types.ObjectId
   subscribedTo: Types.ObjectId
   createdAt: Date
   updatedAt: Date
+}
+
+export interface IPlaylist extends Document {
+  _id: string
+  title: string
+  description?: string
+  videos: Types.ObjectId[]
+  owner: Types.ObjectId
+}
+
+export interface IComment extends Document {
+  text: string
+  video: Types.ObjectId
+  user: Types.ObjectId
+}
+
+export interface ILikes extends Document {
+  _id: string
+  comment: Types.ObjectId
+  video: Types.ObjectId
+  tweet: Types.ObjectId
+  likedBy: Types.ObjectId
+}
+
+export interface ITweet extends Document {
+  _id: string
+  text: string
+  user: Types.ObjectId
+  likes: Types.ObjectId[]
 }
